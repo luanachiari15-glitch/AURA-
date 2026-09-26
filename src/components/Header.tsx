@@ -10,6 +10,8 @@ interface HeaderProps {
   onOpenNewHabit: () => void;
   onOpenNotificationSettings?: () => void;
   notificationsActive?: boolean;
+  startDate?: string | null;
+  onStartChallenge?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,8 +21,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewHabit,
   onOpenNotificationSettings,
   notificationsActive = false,
+  startDate,
+  onStartChallenge,
 }) => {
-  const challengeStats = getDaysRemainingUntilDec31();
+  const challengeStats = getDaysRemainingUntilDec31(startDate);
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
@@ -134,9 +138,11 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1.5 shrink-0 text-[11px] sm:text-xs">
               <span className="text-slate-300 hidden sm:inline">·</span>
               <span className="text-slate-600 font-medium">
-                {challengeStats.isStarted
-                  ? `Dia ${challengeStats.dayNumber}/${challengeStats.totalChallengeDays}`
-                  : `Início dia 28/09 (${challengeStats.daysUntilStart === 1 ? 'amanhã' : `em ${challengeStats.daysUntilStart} dias`})`}
+                {challengeStats.isStarted ? (
+                  `Dia ${challengeStats.dayNumber}/${challengeStats.totalChallengeDays}`
+                ) : (
+                  <span className="text-slate-500">Inicie quando quiser</span>
+                )}
               </span>
               <span className="text-slate-300">·</span>
               <span className="text-amber-700 font-mono font-bold tabular-nums">
@@ -145,16 +151,29 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            <div className="flex-1 sm:w-36 h-1.5 sm:h-2 bg-slate-200/80 rounded-full overflow-hidden border border-slate-200">
-              <div
-                className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500 shadow-xs"
-                style={{ width: `${challengeStats.percentProgress}%` }}
-              />
-            </div>
-            <span className="text-slate-700 font-mono font-bold text-[10px] sm:text-[11px] tabular-nums shrink-0">
-              {challengeStats.percentProgress}%
-            </span>
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+            {challengeStats.isStarted ? (
+              <>
+                <div className="flex-1 sm:w-36 h-1.5 sm:h-2 bg-slate-200/80 rounded-full overflow-hidden border border-slate-200">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500 shadow-xs"
+                    style={{ width: `${challengeStats.percentProgress}%` }}
+                  />
+                </div>
+                <span className="text-slate-700 font-mono font-bold text-[10px] sm:text-[11px] tabular-nums shrink-0">
+                  {challengeStats.percentProgress}%
+                </span>
+              </>
+            ) : onStartChallenge ? (
+              <button
+                type="button"
+                onClick={onStartChallenge}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold text-[11px] rounded-lg transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+              >
+                <Sparkles className="w-3 h-3 text-slate-950" />
+                <span>Começar Desafio Hoje</span>
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

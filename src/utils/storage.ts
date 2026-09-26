@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   AFFIRMATIONS: 'aura_affirmations_v2',
   VISION_ITEMS: 'aura_vision_items_v2',
   SETTINGS: 'aura_notification_settings_v1',
+  START_DATE: 'aura_challenge_start_date_v2',
 };
 
 // Request storage persistence from browser if available (prevent OS eviction on iOS/Android)
@@ -174,6 +175,33 @@ export function saveNotificationSettings(settings: NotificationSettings): void {
   }
 }
 
+// 7. Challenge Start Date (Dynamic: starts whenever user begins, finishes Dec 31)
+export function loadChallengeStartDate(): string | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.START_DATE);
+    if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export function saveChallengeStartDate(dateStr: string | null): void {
+  try {
+    if (dateStr) {
+      localStorage.setItem(STORAGE_KEYS.START_DATE, dateStr);
+      idbSet(STORAGE_KEYS.START_DATE, dateStr);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.START_DATE);
+      idbDel(STORAGE_KEYS.START_DATE);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 // Background sync from IndexedDB if localStorage was cleared
 export async function syncFromIndexedDBIfAvailable(): Promise<{
   recovered: boolean;
@@ -183,6 +211,7 @@ export async function syncFromIndexedDBIfAvailable(): Promise<{
   affirmations?: Affirmation[];
   visionItems?: VisionItem[];
   settings?: NotificationSettings;
+  challengeStartDate?: string | null;
 }> {
   try {
     const habitsInLs = localStorage.getItem(STORAGE_KEYS.HABITS);
@@ -193,14 +222,16 @@ export async function syncFromIndexedDBIfAvailable(): Promise<{
       const idbAffirmations = await idbGet<Affirmation[]>(STORAGE_KEYS.AFFIRMATIONS);
       const idbVision = await idbGet<VisionItem[]>(STORAGE_KEYS.VISION_ITEMS);
       const idbSettings = await idbGet<NotificationSettings>(STORAGE_KEYS.SETTINGS);
+      const idbStartDate = await idbGet<string>(STORAGE_KEYS.START_DATE);
 
-      if (idbHabits || idbGoals || idbRecords) {
+      if (idbHabits || idbGoals || idbRecords || idbStartDate) {
         if (idbHabits) saveHabits(idbHabits);
         if (idbGoals) saveGoals(idbGoals);
         if (idbRecords) saveDayRecords(idbRecords);
         if (idbAffirmations) saveAffirmations(idbAffirmations);
         if (idbVision) saveVisionItems(idbVision);
         if (idbSettings) saveNotificationSettings(idbSettings);
+        if (idbStartDate) saveChallengeStartDate(idbStartDate);
 
         return {
           recovered: true,
@@ -210,6 +241,7 @@ export async function syncFromIndexedDBIfAvailable(): Promise<{
           affirmations: idbAffirmations,
           visionItems: idbVision,
           settings: idbSettings,
+          challengeStartDate: idbStartDate,
         };
       }
     }
@@ -219,7 +251,7 @@ export async function syncFromIndexedDBIfAvailable(): Promise<{
   return { recovered: false };
 }
 
-// 7. Backup Export & Import with strict validation
+// 8. Backup Export & Import with strict validation
 export interface AuraBackupData {
   app: 'AURA';
   version: 2;
@@ -231,6 +263,7 @@ export interface AuraBackupData {
     affirmations: Affirmation[];
     visionItems: VisionItem[];
     notificationSettings?: NotificationSettings;
+    challengeStartDate?: string | null;
   };
 }
 
@@ -246,6 +279,7 @@ export function exportAppData(): string {
       affirmations: loadAffirmations(),
       visionItems: loadVisionItems(),
       notificationSettings: loadNotificationSettings(),
+      challengeStartDate: loadChallengeStartDate(),
     },
   };
   return JSON.stringify(backup, null, 2);
@@ -320,6 +354,11 @@ export function validateAndParseBackup(jsonString: string): ImportValidationResu
         ? { ...DEFAULT_NOTIFICATION_SETTINGS, ...dataCandidate.notificationSettings }
         : DEFAULT_NOTIFICATION_SETTINGS;
 
+    const challengeStartDate: string | null =
+      typeof dataCandidate.challengeStartDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dataCandidate.challengeStartDate)
+        ? dataCandidate.challengeStartDate
+        : null;
+
     return {
       success: true,
       summary: {
@@ -335,6 +374,7 @@ export function validateAndParseBackup(jsonString: string): ImportValidationResu
         affirmations,
         visionItems,
         notificationSettings,
+        challengeStartDate,
       },
     };
   } catch (err) {
@@ -353,5 +393,8 @@ export function applyBackupData(data: AuraBackupData['data']): void {
   saveVisionItems(data.visionItems);
   if (data.notificationSettings) {
     saveNotificationSettings(data.notificationSettings);
+  }
+  if (data.challengeStartDate !== undefined) {
+    saveChallengeStartDate(data.challengeStartDate);
   }
 }

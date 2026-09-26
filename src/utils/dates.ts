@@ -1,5 +1,4 @@
 export const CHALLENGE_END_DATE = '2026-12-31';
-export const CHALLENGE_START_DATE = '2026-09-28';
 
 export function getTodayDateString(): string {
   const now = new Date();
@@ -41,23 +40,45 @@ export function getDayOfWeekAbbr(dateStr: string): string {
   return abbrs[date.getDay()];
 }
 
-export function getDaysRemainingUntilDec31(currentDateStr: string = getTodayDateString()): {
+/**
+ * Calculates challenge days dynamically:
+ * Starts whenever the user begins (startDateStr), and always concludes on December 31st (CHALLENGE_END_DATE).
+ * If not started yet, shows days remaining until Dec 31 and waits for user's first day.
+ */
+export function getDaysRemainingUntilDec31(
+  startDateStr?: string | null,
+  currentDateStr: string = getTodayDateString(),
+  endDateStr: string = CHALLENGE_END_DATE
+): {
   daysRemaining: number;
   totalChallengeDays: number;
   dayNumber: number;
   percentProgress: number;
   isStarted: boolean;
   daysUntilStart: number;
+  startDate: string | null;
 } {
   const current = parseDate(currentDateStr);
-  const start = parseDate(CHALLENGE_START_DATE);
-  const end = parseDate(CHALLENGE_END_DATE);
-
+  const end = parseDate(endDateStr);
   const msPerDay = 1000 * 60 * 60 * 24;
-  
-  const totalChallengeDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / msPerDay) + 1);
+
   const daysRemaining = Math.max(0, Math.round((end.getTime() - current.getTime()) / msPerDay));
-  
+
+  if (!startDateStr) {
+    const daysFromTodayToEnd = Math.max(1, Math.round((end.getTime() - current.getTime()) / msPerDay) + 1);
+    return {
+      daysRemaining,
+      totalChallengeDays: daysFromTodayToEnd,
+      dayNumber: 0,
+      percentProgress: 0,
+      isStarted: false,
+      daysUntilStart: 0,
+      startDate: null,
+    };
+  }
+
+  const start = parseDate(startDateStr);
+  const totalChallengeDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / msPerDay) + 1);
   const isStarted = current.getTime() >= start.getTime();
   const daysUntilStart = Math.max(0, Math.round((start.getTime() - current.getTime()) / msPerDay));
 
@@ -68,8 +89,14 @@ export function getDaysRemainingUntilDec31(currentDateStr: string = getTodayDate
     dayNumber = 0;
     percentProgress = 0;
   } else {
-    dayNumber = Math.min(totalChallengeDays, Math.max(1, Math.round((current.getTime() - start.getTime()) / msPerDay) + 1));
-    percentProgress = Math.min(100, Math.max(0, Math.round((dayNumber / totalChallengeDays) * 100)));
+    dayNumber = Math.min(
+      totalChallengeDays,
+      Math.max(1, Math.round((current.getTime() - start.getTime()) / msPerDay) + 1)
+    );
+    percentProgress = Math.min(
+      100,
+      Math.max(0, Math.round((dayNumber / totalChallengeDays) * 100))
+    );
   }
 
   return {
@@ -79,7 +106,29 @@ export function getDaysRemainingUntilDec31(currentDateStr: string = getTodayDate
     percentProgress,
     isStarted,
     daysUntilStart,
+    startDate: startDateStr,
   };
+}
+
+/**
+ * Resolves effective challenge start date:
+ * Returns saved start date if present, or detects the earliest day with completed habits, or null.
+ */
+export function resolveChallengeStartDate(
+  savedStartDate: string | null,
+  dayRecords: Record<string, { completedHabits: string[] }>
+): string | null {
+  if (savedStartDate && /^\d{4}-\d{2}-\d{2}$/.test(savedStartDate)) {
+    return savedStartDate;
+  }
+  const datesWithCompletions = Object.keys(dayRecords)
+    .filter((k) => dayRecords[k]?.completedHabits && dayRecords[k].completedHabits.length > 0)
+    .sort();
+
+  if (datesWithCompletions.length > 0) {
+    return datesWithCompletions[0];
+  }
+  return null;
 }
 
 export function getRecentDaysWindow(currentDateStr: string = getTodayDateString(), daysBefore = 7, daysAfter = 2): string[] {

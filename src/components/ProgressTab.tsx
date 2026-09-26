@@ -19,7 +19,6 @@ import {
   parseDate,
   getDayProgress,
   isHabitScheduledForDate,
-  CHALLENGE_START_DATE,
 } from '../utils/dates';
 import { exportAppData, validateAndParseBackup, applyBackupData } from '../utils/storage';
 
@@ -28,6 +27,7 @@ interface ProgressTabProps {
   dayRecords: Record<string, DayRecord>;
   onSelectDate: (date: string) => void;
   onRefreshData: () => void;
+  startDate?: string | null;
 }
 
 export const ProgressTab: React.FC<ProgressTabProps> = ({
@@ -35,6 +35,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
   dayRecords,
   onSelectDate,
   onRefreshData,
+  startDate,
 }) => {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear] = useState<number>(new Date().getFullYear());
@@ -311,7 +312,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
                     <span className="font-bold tabular-nums font-mono leading-none">{item.dayNumber}</span>
                     {item.isToday ? (
                       <span className="text-[8px] sm:text-[9px] font-extrabold text-amber-700 uppercase font-mono">Hoje</span>
-                    ) : item.dateStr === CHALLENGE_START_DATE ? (
+                    ) : startDate && item.dateStr === startDate ? (
                       <span className="text-[7px] sm:text-[8px] font-bold text-emerald-700 bg-emerald-100/90 px-1 py-0.5 rounded uppercase font-mono">Início</span>
                     ) : null}
                   </div>

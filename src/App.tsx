@@ -30,8 +30,10 @@ import {
   syncFromIndexedDBIfAvailable,
   AuraBackupData,
   applyBackupData,
+  loadChallengeStartDate,
+  saveChallengeStartDate,
 } from './utils/storage';
-import { getTodayDateString, calculateStreak } from './utils/dates';
+import { getTodayDateString, calculateStreak, resolveChallengeStartDate } from './utils/dates';
 import { Header } from './components/Header';
 import { TodayTab } from './components/TodayTab';
 import { ProgressTab } from './components/ProgressTab';
@@ -61,6 +63,11 @@ export default function App() {
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() =>
     loadNotificationSettings()
   );
+  const [challengeStartDate, setChallengeStartDate] = useState<string | null>(() =>
+    loadChallengeStartDate()
+  );
+
+  const effectiveStartDate = resolveChallengeStartDate(challengeStartDate, dayRecords);
 
   // UI States
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
@@ -82,6 +89,7 @@ export default function App() {
         if (res.affirmations) setAffirmations(res.affirmations);
         if (res.visionItems) setVisionItems(res.visionItems);
         if (res.settings) setNotificationSettings(res.settings);
+        if (res.challengeStartDate !== undefined) setChallengeStartDate(res.challengeStartDate);
       }
     });
   }, []);
@@ -135,7 +143,18 @@ export default function App() {
     if (data.notificationSettings) {
       setNotificationSettings(data.notificationSettings);
     }
+    if (data.challengeStartDate !== undefined) {
+      setChallengeStartDate(data.challengeStartDate);
+      saveChallengeStartDate(data.challengeStartDate);
+    }
     applyBackupData(data);
+  };
+
+  const handleStartChallenge = () => {
+    const today = getTodayDateString();
+    setChallengeStartDate(today);
+    saveChallengeStartDate(today);
+    showEncouragement('Desafio iniciado com sucesso! Rumo a 31 de Dezembro! 🚀✨');
   };
 
   // Synchronize to localStorage
