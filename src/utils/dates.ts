@@ -1,5 +1,5 @@
 export const CHALLENGE_END_DATE = '2026-12-31';
-export const CHALLENGE_START_DATE = '2026-09-01';
+export const CHALLENGE_START_DATE = '2026-09-28';
 
 export function getTodayDateString(): string {
   const now = new Date();
@@ -46,6 +46,8 @@ export function getDaysRemainingUntilDec31(currentDateStr: string = getTodayDate
   totalChallengeDays: number;
   dayNumber: number;
   percentProgress: number;
+  isStarted: boolean;
+  daysUntilStart: number;
 } {
   const current = parseDate(currentDateStr);
   const start = parseDate(CHALLENGE_START_DATE);
@@ -55,14 +57,28 @@ export function getDaysRemainingUntilDec31(currentDateStr: string = getTodayDate
   
   const totalChallengeDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / msPerDay) + 1);
   const daysRemaining = Math.max(0, Math.round((end.getTime() - current.getTime()) / msPerDay));
-  const dayNumber = Math.min(totalChallengeDays, Math.max(1, Math.round((current.getTime() - start.getTime()) / msPerDay) + 1));
-  const percentProgress = Math.min(100, Math.max(0, Math.round(((totalChallengeDays - daysRemaining) / totalChallengeDays) * 100)));
+  
+  const isStarted = current.getTime() >= start.getTime();
+  const daysUntilStart = Math.max(0, Math.round((start.getTime() - current.getTime()) / msPerDay));
+
+  let dayNumber: number;
+  let percentProgress: number;
+
+  if (!isStarted) {
+    dayNumber = 0;
+    percentProgress = 0;
+  } else {
+    dayNumber = Math.min(totalChallengeDays, Math.max(1, Math.round((current.getTime() - start.getTime()) / msPerDay) + 1));
+    percentProgress = Math.min(100, Math.max(0, Math.round((dayNumber / totalChallengeDays) * 100)));
+  }
 
   return {
     daysRemaining,
     totalChallengeDays,
     dayNumber,
     percentProgress,
+    isStarted,
+    daysUntilStart,
   };
 }
 
@@ -143,8 +159,17 @@ export function getDayProgress(
   const scheduledHabits = habits.filter((h) => isHabitScheduledForDate(h, dateStr));
   const scheduledCount = scheduledHabits.length;
 
+  if (habits.length === 0) {
+    return {
+      scheduledHabitsCount: 0,
+      completedScheduledCount: 0,
+      percentage: 0,
+      isAllCompleted: false,
+    };
+  }
+
   if (scheduledCount === 0) {
-    // If no habits were specifically scheduled for this day, but user completed any, 100% or 0
+    // If no habits were specifically scheduled for this day, but habits exist in app
     return {
       scheduledHabitsCount: 0,
       completedScheduledCount: 0,
@@ -175,7 +200,7 @@ export function calculateStreak(dailyRecords: Record<string, { completedHabits: 
     totalCompleted += rec?.completedHabits?.length || 0;
   });
 
-  const allDates = Object.keys(dailyRecords).sort();
+  const allDates = Object.keys(dailyRecords).filter((k) => dailyRecords[k]?.completedHabits?.length > 0).sort();
   if (allDates.length === 0) {
     return { currentStreak: 0, bestStreak: 0, totalCompletedHabitsCount: 0 };
   }
@@ -208,24 +233,22 @@ export function calculateStreak(dailyRecords: Record<string, { completedHabits: 
     }
   }
 
-  // Calculate best streak historically
+  // Calculate best streak dynamically across full timeline
   let bestStreak = currentStreak;
   let tempStreak = 0;
   
-  // Create timeline of active days
-  const startYear = 2026;
-  const startDay = new Date(startYear, 7, 1); // August 1st onwards
-  const today = parseDate(targetDateStr);
+  const startDay = parseDate(allDates[0]);
+  const endDay = parseDate(targetDateStr);
   const dayStep = new Date(startDay);
 
-  while (dayStep <= today) {
+  while (dayStep <= endDay) {
     const y = dayStep.getFullYear();
     const m = String(dayStep.getMonth() + 1).padStart(2, '0');
     const d = String(dayStep.getDate()).padStart(2, '0');
     const key = `${y}-${m}-${d}`;
 
     const rec = dailyRecords[key];
-    if (rec && rec.completedHabits.length > 0) {
+    if (rec && rec.completedHabits && rec.completedHabits.length > 0) {
       tempStreak++;
       if (tempStreak > bestStreak) {
         bestStreak = tempStreak;

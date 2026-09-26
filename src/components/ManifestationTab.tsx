@@ -15,6 +15,7 @@ import {
 import confetti from 'canvas-confetti';
 import { Affirmation, VisionItem, DayRecord, LawOfAttractionPractices } from '../types';
 import { LIFE_AREAS } from '../data/constants';
+import { ConfirmModal } from './ConfirmModal';
 
 interface ManifestationTabProps {
   dayRecord: DayRecord;
@@ -48,6 +49,11 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
   const [visionFeeling, setVisionFeeling] = useState('');
 
   const [focusAffirmation, setFocusAffirmation] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'vision' | 'affirmation';
+    id: string;
+    title: string;
+  } | null>(null);
 
   const practices: LawOfAttractionPractices = dayRecord.practices || {
     visualization: false,
@@ -134,17 +140,17 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
   const completedPracticesCount = Object.values(practices).filter(Boolean).length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* 1. Header Banner */}
-      <div className="bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-50/80 border border-amber-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
-        <div className="relative z-10 max-w-2xl space-y-2">
+      <div className="bg-gradient-to-r from-amber-50 via-orange-50/60 to-amber-50/80 border border-amber-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
+        <div className="relative z-10 max-w-2xl space-y-1.5 sm:space-y-2">
           <div className="flex items-center gap-2 text-xs text-amber-700 font-mono tracking-wider uppercase font-bold">
             <Compass className="w-4 h-4 text-amber-600" />
             <span>Alinhamento & Manifestação</span>
             <span aria-hidden="true">·</span>
             <span>Desafio 3 Meses</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 font-display">
+          <h1 className="text-lg sm:text-2xl font-extrabold tracking-tight text-slate-900 font-display">
             A Lei da Atração & O Meu Eu de Dezembro
           </h1>
           <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
@@ -185,16 +191,15 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
                     : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
                 }`}
               >
-                <button
-                  type="button"
-                  className={`w-5 h-5 rounded-md mt-0.5 flex items-center justify-center transition-all shrink-0 ${
+                <div
+                  className={`w-6 h-6 rounded-lg mt-0.5 flex items-center justify-center transition-all shrink-0 active:scale-90 ${
                     isDone
                       ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
                       : 'border-2 border-slate-300 bg-white'
                   }`}
                 >
                   {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                </button>
+                </div>
 
                 <div className="flex-1">
                   <p
@@ -327,12 +332,8 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
                     {item.title}
                   </span>
                   <button
-                    onClick={() => {
-                      if (confirm('Deseja excluir este item de visualização?')) {
-                        onDeleteVisionItem(item.id);
-                      }
-                    }}
-                    className="text-slate-400 hover:text-red-500 p-1 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    onClick={() => setDeleteTarget({ type: 'vision', id: item.id, title: item.title })}
+                    className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer active:scale-90"
                     title="Excluir"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -414,8 +415,12 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
               key={aff.id}
               className="bg-white border border-slate-200/80 rounded-xl p-4 flex items-start justify-between gap-3 hover:border-slate-300 transition-colors shadow-2xs group"
             >
-              <div className="flex-1 space-y-1">
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-snug">
+              <div
+                className="flex-1 space-y-1 cursor-pointer"
+                onClick={() => setFocusAffirmation(aff.text)}
+                title="Clique para abrir no Modo Foco / Meditação"
+              >
+                <p className="text-xs sm:text-sm font-semibold text-slate-800 hover:text-amber-700 leading-snug transition-colors">
                   "{aff.text}"
                 </p>
               </div>
@@ -429,12 +434,8 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
                   <Maximize2 className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm('Deseja excluir esta afirmação?')) {
-                      onDeleteAffirmation(aff.id);
-                    }
-                  }}
-                  className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                  onClick={() => setDeleteTarget({ type: 'affirmation', id: aff.id, title: aff.text })}
+                  className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer active:scale-90"
                   title="Excluir"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -447,11 +448,11 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
 
       {/* 5. Big Affirmation Focus Mode Modal */}
       {focusAffirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="max-w-xl w-full bg-white border border-amber-300 rounded-3xl p-8 sm:p-10 text-center space-y-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="max-w-xl w-full bg-white border border-amber-300 rounded-2xl sm:rounded-3xl p-6 sm:p-10 text-center space-y-4 sm:space-y-6 shadow-2xl relative">
             <button
               onClick={() => setFocusAffirmation(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-2 cursor-pointer"
+              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-2 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -480,6 +481,31 @@ export const ManifestationTab: React.FC<ManifestationTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* In-app Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title={deleteTarget?.type === 'vision' ? 'Excluir Item de Visualização' : 'Excluir Afirmação'}
+        message={
+          deleteTarget?.type === 'vision'
+            ? `Tem certeza que deseja remover o item "${deleteTarget?.title}" do seu quadro de visualização?`
+            : `Tem certeza que deseja remover a afirmação "${deleteTarget?.title}"?`
+        }
+        confirmLabel="Excluir"
+        onConfirm={() => {
+          if (deleteTarget) {
+            if (deleteTarget.type === 'vision') {
+              onDeleteVisionItem(deleteTarget.id);
+              onShowEncouragement('Item de visualização removido com sucesso.');
+            } else {
+              onDeleteAffirmation(deleteTarget.id);
+              onShowEncouragement('Afirmação removida com sucesso.');
+            }
+            setDeleteTarget(null);
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

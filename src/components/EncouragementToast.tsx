@@ -16,7 +16,7 @@ export const EncouragementToast: React.FC<ToastProps> = ({ message, onClose }) =
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed bottom-20 md:bottom-6 right-6 z-50 max-w-sm w-full bg-white border border-amber-300 text-slate-900 rounded-2xl p-4 shadow-xl shadow-slate-900/10 flex items-start gap-3 backdrop-blur-md"
+          className="fixed bottom-24 md:bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-50 max-w-sm w-auto sm:w-full bg-white border border-amber-300 text-slate-900 rounded-2xl p-3.5 sm:p-4 shadow-xl shadow-slate-900/10 flex items-start gap-3 backdrop-blur-md"
         >
           <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
             <Sparkles className="w-4 h-4" />

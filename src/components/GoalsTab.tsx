@@ -13,6 +13,7 @@ import {
 import confetti from 'canvas-confetti';
 import { AreaGoal, LifeAreaId } from '../types';
 import { LIFE_AREAS } from '../data/constants';
+import { ConfirmModal } from './ConfirmModal';
 
 interface GoalsTabProps {
   goals: AreaGoal[];
@@ -39,6 +40,7 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
 
   const [addingMilestoneToGoalId, setAddingMilestoneToGoalId] = useState<string | null>(null);
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
+  const [goalToDelete, setGoalToDelete] = useState<AreaGoal | null>(null);
 
   const filteredGoals = goals.filter((g) => {
     if (selectedArea !== 'all' && g.areaId !== selectedArea) return false;
@@ -93,6 +95,18 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
     setAddingMilestoneToGoalId(null);
   };
 
+  const handleDeleteMilestone = (goal: AreaGoal, milestoneId: string) => {
+    const nextMilestones = goal.milestones.filter((m) => m.id !== milestoneId);
+    const completedCount = nextMilestones.filter((m) => m.completed).length;
+    const isCompleted = nextMilestones.length > 0 && completedCount === nextMilestones.length;
+
+    onUpdateGoal({
+      ...goal,
+      milestones: nextMilestones,
+      completed: isCompleted,
+    });
+  };
+
   const handleCreateGoal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
@@ -124,23 +138,23 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* 1. Header & Intro */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs text-amber-600 font-mono tracking-wider uppercase font-semibold mb-1">
+          <div className="flex items-center gap-2 text-xs text-amber-600 font-mono tracking-wider uppercase font-semibold mb-0.5 sm:mb-1">
             <span>Diretrizes Estratégicas</span>
             <span aria-hidden="true">·</span>
             <span>Meta de 3 Meses</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
             Metas por Área da Vida
           </h1>
         </div>
 
         <button
           onClick={() => setIsAddingGoal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-sm shadow-amber-500/20 active:scale-95 cursor-pointer"
+          className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-sm shadow-amber-500/20 active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>Definir Nova Meta</span>
@@ -148,7 +162,7 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
       </div>
 
       {/* 2. Area Filter Bar */}
-      <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200/80 rounded-xl overflow-x-auto shadow-2xs">
+      <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200/80 rounded-xl overflow-x-auto shadow-2xs scrollbar-none">
         <button
           onClick={() => setSelectedArea('all')}
           className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
@@ -333,15 +347,11 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
                       </span>
                     )}
                     <button
-                      onClick={() => {
-                        if (confirm('Deseja excluir esta meta?')) {
-                          onDeleteGoal(goal.id);
-                        }
-                      }}
-                      className="text-slate-400 hover:text-red-500 p-1 transition-colors cursor-pointer"
+                      onClick={() => setGoalToDelete(goal)}
+                      className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer active:scale-90"
                       title="Excluir meta"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -396,6 +406,17 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
                         {milestone.completed && <Check className="w-3 h-3 stroke-[3]" />}
                       </button>
                       <span className="flex-1 leading-snug font-medium">{milestone.title}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteMilestone(goal, milestone.id);
+                        }}
+                        className="text-slate-300 hover:text-red-500 p-1 rounded transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
+                        title="Remover marco"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -404,13 +425,13 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
               {/* Add milestone mini form */}
               <div className="mt-4 pt-3 border-t border-slate-100">
                 {addingMilestoneToGoalId === goal.id ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <input
                       type="text"
                       value={newMilestoneTitle}
                       onChange={(e) => setNewMilestoneTitle(e.target.value)}
                       placeholder="Novo marco para esta meta..."
-                      className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white"
+                      className="flex-1 min-w-0 px-2.5 sm:px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -421,7 +442,7 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
                     />
                     <button
                       onClick={() => handleAddMilestone(goal)}
-                      className="px-3 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-lg hover:bg-amber-400 cursor-pointer"
+                      className="px-2.5 sm:px-3 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-lg hover:bg-amber-400 cursor-pointer shrink-0"
                     >
                       Adicionar
                     </button>
@@ -447,6 +468,22 @@ export const GoalsTab: React.FC<GoalsTabProps> = ({
         })}
         </div>
       )}
+
+      {/* In-app Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!goalToDelete}
+        title="Excluir Meta"
+        message={`Tem certeza que deseja excluir a meta "${goalToDelete?.title}"? Todos os seus marcos intermediários e progresso serão removidos permanentemente.`}
+        confirmLabel="Excluir Meta"
+        onConfirm={() => {
+          if (goalToDelete) {
+            onDeleteGoal(goalToDelete.id);
+            onShowEncouragement('Meta removida com sucesso.');
+            setGoalToDelete(null);
+          }
+        }}
+        onCancel={() => setGoalToDelete(null)}
+      />
     </div>
   );
 };

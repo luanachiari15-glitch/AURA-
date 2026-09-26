@@ -12,10 +12,13 @@ import {
   Layers,
   Heart,
   Compass,
+  ArrowRight,
+  Trash2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Habit, DayRecord, LifeAreaId } from '../types';
 import { LIFE_AREAS, ENCOURAGEMENT_PHRASES } from '../data/constants';
+import { ConfirmModal } from './ConfirmModal';
 import {
   formatDateToPtBr,
   getRecentDaysWindow,
@@ -34,9 +37,11 @@ interface TodayTabProps {
   onToggleHabit: (habitId: string) => void;
   onUpdateDayRecord: (record: Partial<DayRecord>) => void;
   onEditHabit: (habit: Habit) => void;
+  onDeleteHabit?: (habitId: string) => void;
   onOpenNewHabit: () => void;
   streakCount: number;
   onShowEncouragement: (message: string) => void;
+  onSelectTab?: (tab: 'today' | 'progress' | 'goals' | 'manifestation') => void;
 }
 
 export const TodayTab: React.FC<TodayTabProps> = ({
@@ -47,14 +52,17 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   onToggleHabit,
   onUpdateDayRecord,
   onEditHabit,
+  onDeleteHabit,
   onOpenNewHabit,
   streakCount,
   onShowEncouragement,
+  onSelectTab,
 }) => {
   const [selectedAreaFilter, setSelectedAreaFilter] = useState<LifeAreaId | 'all'>('all');
   const [noteText, setNoteText] = useState(dayRecord.note || '');
   const [gratitudeText, setGratitudeText] = useState(dayRecord.gratitude || '');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [habitToDelete, setHabitToDelete] = useState<Habit | null>(null);
 
   const todayStr = getTodayDateString();
   const isToday = selectedDate === todayStr;
@@ -102,6 +110,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
       gratitude: gratitudeText,
     });
     setIsEditingNotes(false);
+    onShowEncouragement('Reflexão e gratidão registradas com sucesso! ✍️✨');
   };
 
   const areasList = Object.values(LIFE_AREAS).filter((area) => {
@@ -150,6 +159,12 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   };
 
   const getDailyStatusGreeting = () => {
+    if (habits.length === 0) {
+      return 'Bem-vindo(a) ao AURA ✦ Cadastre seus primeiros hábitos para iniciar seu desafio diário.';
+    }
+    if (totalHabitsCount === 0) {
+      return 'Nenhum hábito agendado para hoje. Aproveite para descansar ou revisar suas metas!';
+    }
     if (completionPercentage === 100) {
       return '100% Concluído! Todos os hábitos previstos para hoje foram cumpridos com maestria. 🎉';
     }
@@ -163,17 +178,17 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* 1. Date Selector Carousel & Header */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2 text-xs text-amber-600 font-mono tracking-wider uppercase font-semibold mb-1">
+            <div className="flex items-center gap-2 text-xs text-amber-600 font-mono tracking-wider uppercase font-semibold mb-0.5 sm:mb-1">
               <span>Desafio 3 Meses</span>
               <span aria-hidden="true">·</span>
               <span>{isToday ? 'Dia Atual' : 'Histórico'}</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
               {formatDateToPtBr(selectedDate)}
             </h1>
           </div>
@@ -186,7 +201,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                 const prevStr = prev.toISOString().split('T')[0];
                 onSelectDate(prevStr);
               }}
-              className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer"
               title="Dia anterior"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -195,7 +210,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             {!isToday && (
               <button
                 onClick={() => onSelectDate(todayStr)}
-                className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
               >
                 Voltar para Hoje
               </button>
@@ -208,7 +223,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                 const nextStr = next.toISOString().split('T')[0];
                 onSelectDate(nextStr);
               }}
-              className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer"
               title="Próximo dia"
             >
               <ChevronRight className="w-4 h-4" />
@@ -217,7 +232,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
         </div>
 
         {/* Horizontal Mini Date Strip */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none">
           {recentDates.map((dateStr) => {
             const isSelected = dateStr === selectedDate;
             const isCurrentToday = dateStr === todayStr;
@@ -228,14 +243,14 @@ export const TodayTab: React.FC<TodayTabProps> = ({
               <button
                 key={dateStr}
                 onClick={() => onSelectDate(dateStr)}
-                className={`flex-1 min-w-[58px] py-2 px-1 rounded-xl text-center transition-all cursor-pointer ${
+                className={`flex-1 min-w-[50px] sm:min-w-[58px] py-1.5 sm:py-2 px-1 rounded-xl text-center transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-slate-900 text-white font-bold shadow-sm'
                     : 'bg-slate-50 border border-slate-200/70 text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 hover:border-slate-300'
                 }`}
               >
-                <div className="text-[10px] uppercase font-mono tracking-wider mb-0.5 opacity-80">{abbr}</div>
-                <div className="text-base font-bold tabular-nums">{dayNum}</div>
+                <div className="text-[9px] sm:text-[10px] uppercase font-mono tracking-wider mb-0.5 opacity-80">{abbr}</div>
+                <div className="text-sm sm:text-base font-bold tabular-nums">{dayNum}</div>
                 {isCurrentToday && (
                   <div
                     className={`w-1.5 h-1.5 rounded-full mx-auto mt-0.5 ${
@@ -250,11 +265,11 @@ export const TodayTab: React.FC<TodayTabProps> = ({
       </div>
 
       {/* 2. Overview Stats & Progress Ring Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         {/* Main Progress Ring & Encouragement */}
-        <div className="md:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-6 shadow-xs">
+        <div className="md:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 flex flex-row items-center gap-4 sm:gap-6 shadow-xs">
           {/* Circular SVG Ring */}
-          <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
+          <div className="relative w-20 h-20 sm:w-28 sm:h-28 shrink-0 flex items-center justify-center">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
               <circle
                 cx="50"
@@ -279,48 +294,71 @@ export const TodayTab: React.FC<TodayTabProps> = ({
               />
             </svg>
             <div className="absolute flex flex-col items-center">
-              <span className="text-2xl font-black text-slate-900 font-display tabular-nums">
+              <span className="text-xl sm:text-2xl font-black text-slate-900 font-display tabular-nums">
                 {completionPercentage}%
               </span>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
+              <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
                 do dia
               </span>
             </div>
           </div>
 
-          <div className="flex-1 text-center sm:text-left space-y-2">
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs text-slate-500">
+          <div className="flex-1 min-w-0 text-left space-y-1.5 sm:space-y-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-500">
               <span className="text-slate-900 font-bold font-mono">
-                {completedHabitsCount} de {totalHabitsCount} hábitos previstos
+                {completedHabitsCount}/{totalHabitsCount} previstos
               </span>
               <span aria-hidden="true">·</span>
               <span>{Math.max(0, totalHabitsCount - completedHabitsCount)} pendentes</span>
-              <span aria-hidden="true">·</span>
-              <span className="text-amber-600 font-semibold">Meta de hoje</span>
               {completionPercentage === 100 && totalHabitsCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full ml-1">
-                  ✨ 100% Concluído
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  ✨ 100%
                 </span>
               )}
             </div>
-            <p className="text-sm font-semibold text-slate-800 leading-relaxed font-sans">
+            <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-snug sm:leading-relaxed font-sans line-clamp-2">
               {getDailyStatusGreeting()}
             </p>
-            <div className="pt-1 flex items-center justify-center sm:justify-start gap-4 text-xs text-slate-600">
-              <div className="flex items-center gap-1.5 font-medium">
-                <Flame className="w-4 h-4 text-orange-500 fill-orange-500/20" />
-                <span className="text-slate-900 font-bold">{streakCount} dias</span> seguidos
-              </div>
-              <div className="flex items-center gap-1.5 font-medium text-emerald-700">
-                <Sparkles className="w-4 h-4 text-emerald-600" />
-                <span>Rumo à Dezembro</span>
-              </div>
+            <div className="pt-0.5 flex flex-wrap items-center gap-3 text-[11px] sm:text-xs text-slate-600">
+              {onSelectTab ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('progress')}
+                  className="flex items-center gap-1 font-medium hover:text-orange-600 transition-colors cursor-pointer"
+                  title="Ver histórico e calendário"
+                >
+                  <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/20" />
+                  <span className="text-slate-900 font-bold">{streakCount}d</span> seguidos
+                </button>
+              ) : (
+                <div className="flex items-center gap-1 font-medium">
+                  <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/20" />
+                  <span className="text-slate-900 font-bold">{streakCount}d</span> seguidos
+                </div>
+              )}
+
+              {onSelectTab ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('goals')}
+                  className="flex items-center gap-1 font-medium text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
+                  title="Ver metas estratégicas de 3 meses"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Rumo à Dezembro</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1 font-medium text-emerald-700">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Rumo à Dezembro</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Quick Affirmation of the Day */}
-        <div className="bg-gradient-to-br from-amber-50/70 via-white to-orange-50/50 border border-amber-200/80 rounded-2xl p-5 flex flex-col justify-between shadow-xs relative overflow-hidden">
+        <div className="bg-gradient-to-br from-amber-50/70 via-white to-orange-50/50 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xs relative overflow-hidden">
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-amber-700 font-semibold">
               <span className="flex items-center gap-1.5">
@@ -338,7 +376,18 @@ export const TodayTab: React.FC<TodayTabProps> = ({
           </div>
           <div className="pt-3 border-t border-amber-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>Lei da Atração & Identidade</span>
-            <span className="text-amber-700 font-bold">Eu Ideal</span>
+            {onSelectTab ? (
+              <button
+                type="button"
+                onClick={() => onSelectTab('manifestation')}
+                className="text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+              >
+                <span>Práticas da Atração</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            ) : (
+              <span className="text-amber-700 font-bold">Eu Ideal</span>
+            )}
           </div>
         </div>
       </div>
@@ -391,14 +440,35 @@ export const TodayTab: React.FC<TodayTabProps> = ({
 
       {/* 4. Habits List Grouped by Life Area */}
       <div className="space-y-4">
-        {areasList.length === 0 ? (
+        {habits.length === 0 ? (
+          <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-8 sm:p-10 text-center space-y-4 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-600 flex items-center justify-center mx-auto shadow-2xs">
+              <Sparkles className="w-6 h-6 text-amber-600" />
+            </div>
+            <div className="max-w-md mx-auto space-y-1">
+              <h3 className="text-base font-bold text-slate-900 font-display">
+                Nenhum hábito cadastrado ainda
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                Você está no controle total. Cadastre seus próprios hábitos para o desafio e acompanhe sua evolução diária.
+              </p>
+            </div>
+            <button
+              onClick={onOpenNewHabit}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm shadow-amber-500/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Cadastrar Primeiro Hábito</span>
+            </button>
+          </div>
+        ) : areasList.filter((area) => habits.some((h) => h.areaId === area.id)).length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3 shadow-xs">
             <p className="text-slate-500 text-sm font-medium">Nenhum hábito cadastrado nesta área ainda.</p>
             <button
               onClick={onOpenNewHabit}
-              className="px-4 py-2 bg-amber-500 text-slate-950 rounded-xl text-xs font-bold hover:bg-amber-400 transition-colors shadow-sm"
+              className="px-4 py-2 bg-amber-500 text-slate-950 rounded-xl text-xs font-bold hover:bg-amber-400 transition-colors shadow-sm cursor-pointer"
             >
-              Criar Primeiro Hábito
+              Criar Hábito Nesta Área
             </button>
           </div>
         ) : (
@@ -461,7 +531,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                     return (
                       <div
                         key={habit.id}
-                        className={`group px-5 py-3.5 flex items-center justify-between gap-4 transition-colors ${
+                        className={`group px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between gap-3 sm:gap-4 transition-colors ${
                           isCompleted
                             ? 'bg-emerald-50/30 hover:bg-emerald-50/50'
                             : !isScheduledToday
@@ -470,11 +540,11 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                         }`}
                       >
                         {/* Checkbox & Details */}
-                        <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-3 sm:gap-3.5 flex-1 min-w-0">
                           <button
                             type="button"
                             onClick={() => handleToggle(habit.id)}
-                            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                            className={`w-7 h-7 sm:w-6 sm:h-6 rounded-xl sm:rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-90 ${
                               isCompleted
                                 ? 'bg-amber-500 text-slate-950 shadow-xs'
                                 : 'border-2 border-slate-300 group-hover:border-amber-500 bg-white'
@@ -490,9 +560,9 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                             onClick={() => handleToggle(habit.id)}
                             className="flex-1 min-w-0 cursor-pointer"
                           >
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                               <p
-                                className={`text-sm font-semibold transition-colors truncate ${
+                                className={`text-xs sm:text-sm font-semibold transition-colors truncate ${
                                   isCompleted
                                     ? 'text-slate-400 line-through'
                                     : 'text-slate-800 group-hover:text-slate-950'
@@ -502,7 +572,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                               </p>
                               {!isScheduledToday && (
                                 <span
-                                  className={`text-[10px] font-mono px-2 py-0.5 rounded-full shrink-0 font-medium border ${
+                                  className={`text-[9px] sm:text-[10px] font-mono px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 font-medium border ${
                                     isCompleted
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                       : 'bg-slate-100 text-slate-500 border-slate-200/80'
@@ -510,21 +580,24 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                                   title="Hábitos fora da frequência agendada não interferem no 100% do dia"
                                 >
                                   {isCompleted
-                                    ? '⭐ Extra concluído'
-                                    : 'Folga hoje · Não interfere no 100%'}
+                                    ? '⭐ Extra'
+                                    : 'Folga hoje · Não afeta 100%'}
                                 </span>
                               )}
                             </div>
                             {habit.description && (
-                              <p className="text-xs text-slate-400 truncate mt-0.5">
+                              <p className="text-[11px] sm:text-xs text-slate-400 truncate mt-0.5">
                                 {habit.description}
                               </p>
                             )}
+                            <span className="text-[10px] text-slate-400 font-mono mt-0.5 block md:hidden">
+                              {formatHabitFrequencyLabel(habit)}
+                            </span>
                           </div>
                         </div>
 
                         {/* Frequency & Edit action */}
-                        <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                           <span
                             className={`text-[11px] font-mono hidden md:inline ${
                               isScheduledToday ? 'text-slate-600 font-semibold' : 'text-slate-400'
@@ -535,11 +608,21 @@ export const TodayTab: React.FC<TodayTabProps> = ({
 
                           <button
                             onClick={() => onEditHabit(habit)}
-                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            className="p-2 text-slate-400 hover:text-slate-700 active:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                             title="Editar hábito"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
+
+                          {onDeleteHabit && (
+                            <button
+                              onClick={() => setHabitToDelete(habit)}
+                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors cursor-pointer active:scale-90"
+                              title="Excluir hábito"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -623,6 +706,22 @@ export const TodayTab: React.FC<TodayTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* In-app Delete Habit Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!habitToDelete}
+        title="Excluir Hábito"
+        message={`Tem certeza que deseja excluir o hábito "${habitToDelete?.title}"? Esta ação removerá o hábito do seu desafio diário.`}
+        confirmLabel="Excluir Hábito"
+        onConfirm={() => {
+          if (habitToDelete && onDeleteHabit) {
+            onDeleteHabit(habitToDelete.id);
+            onShowEncouragement('Hábito removido com sucesso.');
+            setHabitToDelete(null);
+          }
+        }}
+        onCancel={() => setHabitToDelete(null)}
+      />
     </div>
   );
 };

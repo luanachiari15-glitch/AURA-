@@ -1,6 +1,8 @@
 {
-  "name": "Vértex • Desafio Minha Melhor Versão",
-  "description": "Planner e habit tracker para o desafio pessoal de 3 meses até dezembro. Acompanhe hábitos, metas por área, progresso diário e práticas da Lei da Atração.",
+  "name": "AURA ✦",
+  "description": "become your best self",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

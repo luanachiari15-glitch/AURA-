@@ -85,3 +85,18 @@ export interface ChallengeConfig {
   name: string;
   commitmentStatement: string;
 }
+
+export interface NotificationSettings {
+  enabled: boolean;
+  consistencyEnabled: boolean;
+  consistencyTime1: string; // e.g. "08:30"
+  consistencyTime2: string; // e.g. "20:30"
+  affirmationsEnabled: boolean;
+  affirmationIntervalHours: number; // 3
+  affirmationsStartTime: string; // e.g. "09:00"
+  affirmationsEndTime: string; // e.g. "00:00"
+  lastConsistencyIndex?: number;
+  lastAffirmationText?: string;
+  lastAffirmationSentAt?: number;
+}
+

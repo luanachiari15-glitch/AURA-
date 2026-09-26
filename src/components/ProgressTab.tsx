@@ -13,8 +13,15 @@ import {
 } from 'lucide-react';
 import { Habit, DayRecord, LifeAreaId } from '../types';
 import { LIFE_AREAS } from '../data/constants';
-import { calculateStreak, getTodayDateString, parseDate, getDayProgress, isHabitScheduledForDate } from '../utils/dates';
-import { exportAppData, importAppData } from '../utils/storage';
+import {
+  calculateStreak,
+  getTodayDateString,
+  parseDate,
+  getDayProgress,
+  isHabitScheduledForDate,
+  CHALLENGE_START_DATE,
+} from '../utils/dates';
+import { exportAppData, validateAndParseBackup, applyBackupData } from '../utils/storage';
 
 interface ProgressTabProps {
   habits: Habit[];
@@ -30,7 +37,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
   onRefreshData,
 }) => {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
-  const [selectedYear] = useState<number>(2026);
+  const [selectedYear] = useState<number>(new Date().getFullYear());
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
   const streakStats = calculateStreak(dayRecords);
@@ -113,7 +120,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vertex_desafio_backup_${todayStr}.json`;
+    a.download = `aura_desafio_backup_${todayStr}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -124,45 +131,46 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
-      const success = importAppData(content);
-      if (success) {
+      const result = validateAndParseBackup(content);
+      if (result.success && result.data) {
+        applyBackupData(result.data);
         setImportStatus('Dados restaurados com sucesso!');
         onRefreshData();
       } else {
-        setImportStatus('Erro ao importar arquivo. Verifique o formato.');
+        setImportStatus(result.error || 'Erro ao importar arquivo. Verifique o formato.');
       }
-      setTimeout(() => setImportStatus(null), 3000);
+      setTimeout(() => setImportStatus(null), 3500);
     };
     reader.readAsText(file);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* 1. Header & Title */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-slate-200">
         <div>
-          <div className="flex items-center gap-2 text-xs text-amber-600 font-mono tracking-wider uppercase font-semibold mb-1">
+          <div className="flex items-center gap-2 text-xs text-amber-600 font-mono tracking-wider uppercase font-semibold mb-0.5 sm:mb-1">
             <span>Evolução do Desafio</span>
             <span aria-hidden="true">·</span>
             <span>Setembro a Dezembro</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 font-display">
             Progresso & Estatísticas
           </h1>
         </div>
 
         {/* Backup Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-all shadow-2xs hover:bg-slate-50 cursor-pointer"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-all shadow-2xs hover:bg-slate-50 cursor-pointer active:scale-95"
             title="Exportar backup dos seus dados"
           >
             <Download className="w-3.5 h-3.5 text-slate-600" />
-            <span>Exportar Dados</span>
+            <span>Exportar</span>
           </button>
 
-          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-all shadow-2xs hover:bg-slate-50 cursor-pointer">
+          <label className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-semibold rounded-xl transition-all shadow-2xs hover:bg-slate-50 cursor-pointer active:scale-95">
             <Upload className="w-3.5 h-3.5 text-slate-600" />
             <span>Importar</span>
             <input type="file" accept=".json" onChange={handleImport} className="hidden" />
@@ -177,77 +185,77 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
       )}
 
       {/* 2. Key Metrics Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Metric 1 */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-2 shadow-xs">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-5 space-y-1 sm:space-y-2 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Sequência Ativa</span>
-            <Flame className="w-4 h-4 text-orange-500 fill-orange-500/20" />
+            <span className="text-[11px] sm:text-xs">Sequência Ativa</span>
+            <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500 fill-orange-500/20" />
           </div>
-          <div className="text-3xl font-extrabold text-slate-900 font-display tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display tabular-nums">
             {streakStats.currentStreak}
-            <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">dias</span>
+            <span className="text-xs font-normal text-slate-400 ml-1 font-sans">dias</span>
           </div>
-          <p className="text-[11px] text-slate-500">Consistência diária ininterrupta</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Consistência diária</p>
         </div>
 
         {/* Metric 2 */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-2 shadow-xs">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-5 space-y-1 sm:space-y-2 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Melhor Sequência</span>
-            <Award className="w-4 h-4 text-emerald-600" />
+            <span className="text-[11px] sm:text-xs">Melhor Sequência</span>
+            <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
           </div>
-          <div className="text-3xl font-extrabold text-slate-900 font-display tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display tabular-nums">
             {streakStats.bestStreak}
-            <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">dias</span>
+            <span className="text-xs font-normal text-slate-400 ml-1 font-sans">dias</span>
           </div>
-          <p className="text-[11px] text-slate-500">Seu recorde pessoal de disciplina</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Seu recorde de foco</p>
         </div>
 
         {/* Metric 3 */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-2 shadow-xs">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-5 space-y-1 sm:space-y-2 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Total de Conclusões</span>
-            <CheckCircle2 className="w-4 h-4 text-blue-600" />
+            <span className="text-[11px] sm:text-xs">Total Concluído</span>
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
           </div>
-          <div className="text-3xl font-extrabold text-slate-900 font-display tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display tabular-nums">
             {streakStats.totalCompletedHabitsCount}
-            <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">ações</span>
+            <span className="text-xs font-normal text-slate-400 ml-1 font-sans">ações</span>
           </div>
-          <p className="text-[11px] text-slate-500">Hábitos cumpridos no desafio</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Hábitos cumpridos</p>
         </div>
 
         {/* Metric 4 */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-2 shadow-xs">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-5 space-y-1 sm:space-y-2 shadow-xs">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Dias 100% Concluídos</span>
-            <Sparkles className="w-4 h-4 text-purple-600" />
+            <span className="text-[11px] sm:text-xs">Dias 100% Feitos</span>
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600" />
           </div>
-          <div className="text-3xl font-extrabold text-slate-900 font-display tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-display tabular-nums">
             {perfectDaysCount}
-            <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">dias</span>
+            <span className="text-xs font-normal text-slate-400 ml-1 font-sans">dias</span>
           </div>
-          <p className="text-[11px] text-slate-500">Dias de aproveitamento absoluto</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">Aproveitamento total</p>
         </div>
       </div>
 
       {/* 3. Monthly Challenge Calendar */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-amber-500" />
-            <h2 className="text-base font-bold text-slate-900 font-display">
-              Calendário do Desafio · {monthsNames[selectedMonth]} {selectedYear}
+            <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 font-display">
+              {monthsNames[selectedMonth]} {selectedYear}
             </h2>
           </div>
 
           {/* Month Switcher */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl">
+          <div className="flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl overflow-x-auto max-w-full">
             {[8, 9, 10, 11].map((mIdx) => (
               <button
                 key={mIdx}
                 onClick={() => setSelectedMonth(mIdx)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   selectedMonth === mIdx
                     ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
                     : 'text-slate-500 hover:text-slate-900'
@@ -261,7 +269,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
 
         {/* Calendar Grid */}
         <div>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 pb-2 border-b border-slate-100 uppercase font-mono">
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-xs font-bold text-slate-400 pb-2 border-b border-slate-100 uppercase font-mono">
             <span>Dom</span>
             <span>Seg</span>
             <span>Ter</span>
@@ -271,9 +279,9 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
             <span>Sáb</span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 pt-3">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 pt-2 sm:pt-3">
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-              <div key={`empty-${i}`} className="h-16 rounded-xl bg-slate-50/50" />
+              <div key={`empty-${i}`} className="h-12 sm:h-16 rounded-lg sm:rounded-xl bg-slate-50/50" />
             ))}
 
             {calendarDays.map((item) => {
@@ -291,7 +299,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
                   key={item.dateStr}
                   onClick={() => onSelectDate(item.dateStr)}
                   disabled={item.isFuture}
-                  className={`h-16 p-1.5 rounded-xl border flex flex-col justify-between text-left transition-all cursor-pointer ${
+                  className={`h-12 sm:h-16 p-1 sm:p-1.5 rounded-lg sm:rounded-xl border flex flex-col justify-between text-left transition-all cursor-pointer active:scale-95 ${
                     item.isToday
                       ? 'ring-2 ring-amber-500 border-amber-500 bg-amber-50/40 shadow-xs'
                       : item.isFuture
@@ -299,27 +307,29 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
                       : `${dotBg} hover:border-slate-400 hover:shadow-2xs`
                   }`}
                 >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold tabular-nums font-mono">{item.dayNumber}</span>
-                    {item.isToday && (
-                      <span className="text-[9px] font-extrabold text-amber-700 uppercase font-mono">Hoje</span>
-                    )}
+                  <div className="flex items-center justify-between text-[11px] sm:text-xs">
+                    <span className="font-bold tabular-nums font-mono leading-none">{item.dayNumber}</span>
+                    {item.isToday ? (
+                      <span className="text-[8px] sm:text-[9px] font-extrabold text-amber-700 uppercase font-mono">Hoje</span>
+                    ) : item.dateStr === CHALLENGE_START_DATE ? (
+                      <span className="text-[7px] sm:text-[8px] font-bold text-emerald-700 bg-emerald-100/90 px-1 py-0.5 rounded uppercase font-mono">Início</span>
+                    ) : null}
                   </div>
 
                   {!item.isFuture && item.completedCount > 0 ? (
-                    <div className="space-y-1">
-                      <div className="w-full h-1.5 bg-slate-200/80 rounded-full overflow-hidden">
+                    <div className="space-y-0.5 sm:space-y-1">
+                      <div className="w-full h-1 sm:h-1.5 bg-slate-200/80 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-amber-500 rounded-full"
                           style={{ width: `${item.completionPercent}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-slate-600 font-mono font-bold block tabular-nums leading-none">
+                      <span className="text-[8px] sm:text-[10px] text-slate-600 font-mono font-bold block tabular-nums leading-none">
                         {item.completionPercent}%
                       </span>
                     </div>
                   ) : (
-                    <div className="text-[10px] text-slate-300">-</div>
+                    <div className="text-[9px] text-slate-300 leading-none">-</div>
                   )}
                 </button>
               );

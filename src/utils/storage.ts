@@ -1,244 +1,357 @@
-import { Habit, AreaGoal, Affirmation, VisionItem, DayRecord } from '../types';
-import { INITIAL_HABITS, INITIAL_GOALS, INITIAL_AFFIRMATIONS, INITIAL_VISION_ITEMS } from '../data/constants';
-import { getTodayDateString, parseDate } from './dates';
+import { Habit, AreaGoal, Affirmation, VisionItem, DayRecord, NotificationSettings } from '../types';
+import { INITIAL_AFFIRMATIONS, INITIAL_VISION_ITEMS, DEFAULT_NOTIFICATION_SETTINGS } from '../data/constants';
+import { idbGet, idbSet } from './idb';
 
-const STORAGE_KEYS = {
-  HABITS: 'vertex_habits_v1',
-  RECORDS: 'vertex_day_records_v1',
-  GOALS: 'vertex_goals_v1',
-  AFFIRMATIONS: 'vertex_affirmations_v1',
-  VISION_ITEMS: 'vertex_vision_items_v1',
-  HAS_INITIALIZED: 'vertex_initialized_v1',
+export const STORAGE_KEYS = {
+  HABITS: 'aura_habits_v2',
+  RECORDS: 'aura_day_records_v2',
+  GOALS: 'aura_goals_v2',
+  AFFIRMATIONS: 'aura_affirmations_v2',
+  VISION_ITEMS: 'aura_vision_items_v2',
+  SETTINGS: 'aura_notification_settings_v1',
 };
 
-// Generates realistic past completion history for the last 14 days so the app feels alive on first open
-function generateInitialHistoricalRecords(): Record<string, DayRecord> {
-  const todayStr = getTodayDateString();
-  const today = parseDate(todayStr);
-  const records: Record<string, DayRecord> = {};
-
-  const sampleNotes = [
-    'Sensação maravilhosa de disciplina. Treino rendeu muito.',
-    'Dia de foco intenso no trabalho. Alimentação 100% limpa.',
-    'Energia muito elevada hoje. Senti a conexão com os meus objetivos de dezembro.',
-    'Leitura profunda hoje sobre mentalidade. Durmo com paz no coração.',
-    'Dia produtivo. Prática de visualização matinal foi muito clara e viva.',
-    'Corpo respondendo bem à nova rotina. Menos cansaço à tarde.',
-    'Orgulho da constância. Pequenas vitórias diárias somam grande transformação.',
-  ];
-
-  for (let i = 12; i >= 1; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const dateKey = `${y}-${m}-${day}`;
-
-    // Pick 8 to 11 habits completed on past days
-    const completedCount = 8 + (i % 4);
-    const completed = INITIAL_HABITS.slice(0, Math.min(completedCount, INITIAL_HABITS.length)).map(h => h.id);
-
-    records[dateKey] = {
-      date: dateKey,
-      completedHabits: completed,
-      note: sampleNotes[i % sampleNotes.length],
-      gratitude: 'Grato(a) pela minha saúde, foco inabalável e pelo caminho que estou construindo.',
-      energyLevel: 4 + (i % 2),
-      practices: {
-        visualization: true,
-        gratitude: true,
-        affirmation: true,
-        futureSelfAction: i % 2 === 0,
-        nightScripting: i % 3 === 0,
-      },
-    };
+// Request storage persistence from browser if available (prevent OS eviction on iOS/Android)
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+    try {
+      const isPersisted = await navigator.storage.persisted();
+      if (!isPersisted) {
+        return await navigator.storage.persist();
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
-
-  // Today initial record with 4 habits already checked to prompt completion
-  records[todayStr] = {
-    date: todayStr,
-    completedHabits: ['h1', 'h2', 'h3', 'h11'],
-    note: '',
-    gratitude: 'Grato(a) pela oportunidade de mais um dia rumo à minha melhor versão.',
-    energyLevel: 5,
-    practices: {
-      visualization: true,
-      gratitude: true,
-      affirmation: true,
-      futureSelfAction: false,
-      nightScripting: false,
-    },
-  };
-
-  return records;
+  return false;
 }
 
+// 1. Habits
 export function loadHabits(): Habit[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.HABITS);
-    if (!raw) {
-      saveHabits(INITIAL_HABITS);
-      return INITIAL_HABITS;
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
-    const parsed: Habit[] = JSON.parse(raw);
-    const existingIds = new Set(parsed.map((h) => h.id));
-    let hasNew = false;
-    const merged = [...parsed];
-    INITIAL_HABITS.forEach((h) => {
-      if (!existingIds.has(h.id)) {
-        merged.push(h);
-        hasNew = true;
-      }
-    });
-    if (hasNew) {
-      saveHabits(merged);
-    }
-    return merged;
-  } catch {
-    return INITIAL_HABITS;
+  } catch (e) {
+    console.warn('Error reading habits from localStorage', e);
   }
+  return [];
 }
 
 export function saveHabits(habits: Habit[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify(habits));
+    const serialized = JSON.stringify(habits);
+    localStorage.setItem(STORAGE_KEYS.HABITS, serialized);
+    idbSet(STORAGE_KEYS.HABITS, habits);
   } catch (e) {
     console.error('Error saving habits', e);
   }
 }
 
+// 2. Day Records (Checklists, notes, gratitude, practices)
 export function loadDayRecords(): Record<string, DayRecord> {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.RECORDS);
-    if (!raw) {
-      const initialHistory = generateInitialHistoricalRecords();
-      saveDayRecords(initialHistory);
-      return initialHistory;
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
     }
-    return JSON.parse(raw);
-  } catch {
-    return {};
+  } catch (e) {
+    console.warn('Error reading day records from localStorage', e);
   }
+  return {};
 }
 
 export function saveDayRecords(records: Record<string, DayRecord>): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(records));
+    const serialized = JSON.stringify(records);
+    localStorage.setItem(STORAGE_KEYS.RECORDS, serialized);
+    idbSet(STORAGE_KEYS.RECORDS, records);
   } catch (e) {
     console.error('Error saving day records', e);
   }
 }
 
+// 3. Goals
 export function loadGoals(): AreaGoal[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.GOALS);
-    if (!raw) {
-      saveGoals(INITIAL_GOALS);
-      return INITIAL_GOALS;
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
-    const parsed: AreaGoal[] = JSON.parse(raw);
-    // Ensure any newly introduced areas in INITIAL_GOALS (like financas, glow_up) are merged if missing
-    const existingAreaIds = new Set(parsed.map((g) => g.areaId));
-    let hasNew = false;
-    const merged = [...parsed];
-    INITIAL_GOALS.forEach((initGoal) => {
-      if (!existingAreaIds.has(initGoal.areaId)) {
-        merged.push(initGoal);
-        hasNew = true;
-      }
-    });
-    if (hasNew) {
-      saveGoals(merged);
-    }
-    return merged;
-  } catch {
-    return INITIAL_GOALS;
+  } catch (e) {
+    console.warn('Error reading goals from localStorage', e);
   }
+  return [];
 }
 
 export function saveGoals(goals: AreaGoal[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify(goals));
+    const serialized = JSON.stringify(goals);
+    localStorage.setItem(STORAGE_KEYS.GOALS, serialized);
+    idbSet(STORAGE_KEYS.GOALS, goals);
   } catch (e) {
     console.error('Error saving goals', e);
   }
 }
 
+// 4. Affirmations (keeps existing examples from Law of Attraction as requested)
 export function loadAffirmations(): Affirmation[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.AFFIRMATIONS);
-    if (!raw) {
-      saveAffirmations(INITIAL_AFFIRMATIONS);
-      return INITIAL_AFFIRMATIONS;
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
-    return JSON.parse(raw);
-  } catch {
+    // First time init: preserve existing affirmations examples
+    saveAffirmations(INITIAL_AFFIRMATIONS);
+    return INITIAL_AFFIRMATIONS;
+  } catch (e) {
+    console.warn('Error reading affirmations from localStorage', e);
     return INITIAL_AFFIRMATIONS;
   }
 }
 
 export function saveAffirmations(affirmations: Affirmation[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.AFFIRMATIONS, JSON.stringify(affirmations));
+    const serialized = JSON.stringify(affirmations);
+    localStorage.setItem(STORAGE_KEYS.AFFIRMATIONS, serialized);
+    idbSet(STORAGE_KEYS.AFFIRMATIONS, affirmations);
   } catch (e) {
     console.error('Error saving affirmations', e);
   }
 }
 
+// 5. Vision Board Items
 export function loadVisionItems(): VisionItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.VISION_ITEMS);
-    if (!raw) {
-      saveVisionItems(INITIAL_VISION_ITEMS);
-      return INITIAL_VISION_ITEMS;
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
-    return JSON.parse(raw);
-  } catch {
+    saveVisionItems(INITIAL_VISION_ITEMS);
+    return INITIAL_VISION_ITEMS;
+  } catch (e) {
+    console.warn('Error reading vision items from localStorage', e);
     return INITIAL_VISION_ITEMS;
   }
 }
 
 export function saveVisionItems(items: VisionItem[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.VISION_ITEMS, JSON.stringify(items));
+    const serialized = JSON.stringify(items);
+    localStorage.setItem(STORAGE_KEYS.VISION_ITEMS, serialized);
+    idbSet(STORAGE_KEYS.VISION_ITEMS, items);
   } catch (e) {
     console.error('Error saving vision items', e);
   }
 }
 
-export function exportAppData(): string {
-  const data = {
-    habits: loadHabits(),
-    dayRecords: loadDayRecords(),
-    goals: loadGoals(),
-    affirmations: loadAffirmations(),
-    visionItems: loadVisionItems(),
-    exportDate: new Date().toISOString(),
-  };
-  return JSON.stringify(data, null, 2);
+// 6. Notification Settings
+export function loadNotificationSettings(): NotificationSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    if (raw) {
+      return { ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse(raw) };
+    }
+  } catch {
+    // fallback
+  }
+  return { ...DEFAULT_NOTIFICATION_SETTINGS };
 }
 
-export function importAppData(jsonString: string): boolean {
+export function saveNotificationSettings(settings: NotificationSettings): void {
   try {
-    const parsed = JSON.parse(jsonString);
-    if (parsed.habits) saveHabits(parsed.habits);
-    if (parsed.dayRecords) saveDayRecords(parsed.dayRecords);
-    if (parsed.goals) saveGoals(parsed.goals);
-    if (parsed.affirmations) saveAffirmations(parsed.affirmations);
-    if (parsed.visionItems) saveVisionItems(parsed.visionItems);
-    return true;
-  } catch (e) {
-    console.error('Failed to import app data', e);
-    return false;
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    idbSet(STORAGE_KEYS.SETTINGS, settings);
+  } catch {
+    // ignore
   }
 }
 
-export function resetAppToDefaults(): void {
-  localStorage.removeItem(STORAGE_KEYS.HABITS);
-  localStorage.removeItem(STORAGE_KEYS.RECORDS);
-  localStorage.removeItem(STORAGE_KEYS.GOALS);
-  localStorage.removeItem(STORAGE_KEYS.AFFIRMATIONS);
-  localStorage.removeItem(STORAGE_KEYS.VISION_ITEMS);
-  window.location.reload();
+// Background sync from IndexedDB if localStorage was cleared
+export async function syncFromIndexedDBIfAvailable(): Promise<{
+  recovered: boolean;
+  habits?: Habit[];
+  goals?: AreaGoal[];
+  dayRecords?: Record<string, DayRecord>;
+  affirmations?: Affirmation[];
+  visionItems?: VisionItem[];
+  settings?: NotificationSettings;
+}> {
+  try {
+    const habitsInLs = localStorage.getItem(STORAGE_KEYS.HABITS);
+    if (habitsInLs === null) {
+      const idbHabits = await idbGet<Habit[]>(STORAGE_KEYS.HABITS);
+      const idbGoals = await idbGet<AreaGoal[]>(STORAGE_KEYS.GOALS);
+      const idbRecords = await idbGet<Record<string, DayRecord>>(STORAGE_KEYS.RECORDS);
+      const idbAffirmations = await idbGet<Affirmation[]>(STORAGE_KEYS.AFFIRMATIONS);
+      const idbVision = await idbGet<VisionItem[]>(STORAGE_KEYS.VISION_ITEMS);
+      const idbSettings = await idbGet<NotificationSettings>(STORAGE_KEYS.SETTINGS);
+
+      if (idbHabits || idbGoals || idbRecords) {
+        if (idbHabits) saveHabits(idbHabits);
+        if (idbGoals) saveGoals(idbGoals);
+        if (idbRecords) saveDayRecords(idbRecords);
+        if (idbAffirmations) saveAffirmations(idbAffirmations);
+        if (idbVision) saveVisionItems(idbVision);
+        if (idbSettings) saveNotificationSettings(idbSettings);
+
+        return {
+          recovered: true,
+          habits: idbHabits,
+          goals: idbGoals,
+          dayRecords: idbRecords,
+          affirmations: idbAffirmations,
+          visionItems: idbVision,
+          settings: idbSettings,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Error during IDB recovery check:', err);
+  }
+  return { recovered: false };
+}
+
+// 7. Backup Export & Import with strict validation
+export interface AuraBackupData {
+  app: 'AURA';
+  version: 2;
+  exportedAt: string;
+  data: {
+    habits: Habit[];
+    goals: AreaGoal[];
+    dayRecords: Record<string, DayRecord>;
+    affirmations: Affirmation[];
+    visionItems: VisionItem[];
+    notificationSettings?: NotificationSettings;
+  };
+}
+
+export function exportAppData(): string {
+  const backup: AuraBackupData = {
+    app: 'AURA',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    data: {
+      habits: loadHabits(),
+      goals: loadGoals(),
+      dayRecords: loadDayRecords(),
+      affirmations: loadAffirmations(),
+      visionItems: loadVisionItems(),
+      notificationSettings: loadNotificationSettings(),
+    },
+  };
+  return JSON.stringify(backup, null, 2);
+}
+
+export interface ImportValidationResult {
+  success: boolean;
+  error?: string;
+  summary?: {
+    habitsCount: number;
+    goalsCount: number;
+    daysCount: number;
+    affirmationsCount: number;
+  };
+  data?: AuraBackupData['data'];
+}
+
+export function validateAndParseBackup(jsonString: string): ImportValidationResult {
+  try {
+    if (!jsonString || typeof jsonString !== 'string') {
+      return { success: false, error: 'O arquivo de backup está vazio ou ilegível.' };
+    }
+
+    const parsed = JSON.parse(jsonString);
+
+    // Support both new wrapped format { app: 'AURA', data: {...} } and direct legacy format
+    const dataCandidate = (parsed && parsed.data && typeof parsed.data === 'object') ? parsed.data : parsed;
+
+    if (!dataCandidate || typeof dataCandidate !== 'object') {
+      return { success: false, error: 'Estrutura do arquivo de backup inválida.' };
+    }
+
+    // Validate habits array
+    const habits: Habit[] = Array.isArray(dataCandidate.habits)
+      ? dataCandidate.habits.filter((h: any) => h && typeof h === 'object' && typeof h.id === 'string' && typeof h.title === 'string')
+      : [];
+
+    // Validate goals array
+    const goals: AreaGoal[] = Array.isArray(dataCandidate.goals)
+      ? dataCandidate.goals.filter((g: any) => g && typeof g === 'object' && typeof g.id === 'string' && typeof g.title === 'string')
+      : [];
+
+    // Validate dayRecords object
+    const dayRecords: Record<string, DayRecord> = {};
+    if (dataCandidate.dayRecords && typeof dataCandidate.dayRecords === 'object') {
+      Object.entries(dataCandidate.dayRecords).forEach(([key, rec]: [string, any]) => {
+        if (rec && typeof rec === 'object' && typeof rec.date === 'string') {
+          dayRecords[key] = {
+            date: rec.date,
+            completedHabits: Array.isArray(rec.completedHabits) ? rec.completedHabits : [],
+            note: typeof rec.note === 'string' ? rec.note : '',
+            gratitude: typeof rec.gratitude === 'string' ? rec.gratitude : '',
+            energyLevel: typeof rec.energyLevel === 'number' ? rec.energyLevel : undefined,
+            practices: rec.practices && typeof rec.practices === 'object' ? rec.practices : undefined,
+          };
+        }
+      });
+    }
+
+    // Validate affirmations array
+    const affirmations: Affirmation[] = Array.isArray(dataCandidate.affirmations)
+      ? dataCandidate.affirmations.filter((a: any) => a && typeof a === 'object' && typeof a.id === 'string' && typeof a.text === 'string')
+      : [];
+
+    // Validate vision items array
+    const visionItems: VisionItem[] = Array.isArray(dataCandidate.visionItems)
+      ? dataCandidate.visionItems.filter((v: any) => v && typeof v === 'object' && typeof v.id === 'string' && typeof v.title === 'string')
+      : [];
+
+    const notificationSettings: NotificationSettings =
+      dataCandidate.notificationSettings && typeof dataCandidate.notificationSettings === 'object'
+        ? { ...DEFAULT_NOTIFICATION_SETTINGS, ...dataCandidate.notificationSettings }
+        : DEFAULT_NOTIFICATION_SETTINGS;
+
+    return {
+      success: true,
+      summary: {
+        habitsCount: habits.length,
+        goalsCount: goals.length,
+        daysCount: Object.keys(dayRecords).length,
+        affirmationsCount: affirmations.length,
+      },
+      data: {
+        habits,
+        goals,
+        dayRecords,
+        affirmations,
+        visionItems,
+        notificationSettings,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: 'Formato de arquivo JSON corrompido ou inválido.',
+    };
+  }
+}
+
+export function applyBackupData(data: AuraBackupData['data']): void {
+  saveHabits(data.habits);
+  saveGoals(data.goals);
+  saveDayRecords(data.dayRecords);
+  saveAffirmations(data.affirmations);
+  saveVisionItems(data.visionItems);
+  if (data.notificationSettings) {
+    saveNotificationSettings(data.notificationSettings);
+  }
 }
